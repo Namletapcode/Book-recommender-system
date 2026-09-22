@@ -1,0 +1,14 @@
+node_modules
+.git
+.gitignore
+.cache
+*.json.gz
+*.zip
+*.csv
+*.log
+import_checkpoint.json
+.output
+.vinxi
+dist
+build
+.env

@@ -1,0 +1,25 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AIVEN_DATABASE_URL=postgres://avnadmin:YOUR_AIVEN_PASSWORD@database-recommender-system.f.aivencloud.com:21595/defaultdb?sslmode=require
+      - DATABASE_URL=postgres://avnadmin:YOUR_AIVEN_PASSWORD@database-recommender-system.f.aivencloud.com:21595/defaultdb?sslmode=require
+      - PORT=8000
+    restart: always
+
+  frontend:
+    build:
+      context: ./front_end
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://backend:8000
+      - PORT=3000
+    depends_on:
+      - backend
+    restart: always
