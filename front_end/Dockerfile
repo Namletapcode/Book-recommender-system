@@ -7,8 +7,11 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 3000
+# Build assets ahead of time to eliminate in-memory bundling and avoid OOM SIGKILL
+RUN npm run build
 
+EXPOSE 3000
 ENV PORT=3000
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
+# Run lightweight preview server with minimal memory usage (<50MB)
+CMD ["npm", "run", "preview", "--", "--host", "0.0.0.0", "--port", "3000"]

@@ -17,9 +17,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # === Kết nối Aiven ===
-AIVEN_URL = os.getenv(
-    "AIVEN_DATABASE_URL",
-    "postgres://avnadmin:YOUR_AIVEN_PASSWORD@database-recommender-system.f.aivencloud.com:21595/defaultdb?sslmode=require"
+AIVEN_URL = (
+    os.getenv("AIVEN_DATABASE_URL")
+    or os.getenv("DATABASE_URL")
+    or "postgres://avnadmin:YOUR_AIVEN_PASSWORD@database-recommender-system.f.aivencloud.com:21595/defaultdb?sslmode=require"
 )
 
 def get_conn():
@@ -29,7 +30,11 @@ def get_conn():
 
 # === Khởi tạo schema khi startup ===
 def init_db():
-    """Tạo bảng books trên Aiven nếu chưa có."""
+    """Kiểm tra và chuẩn bị bảng books trên Aiven."""
+    if not AIVEN_URL or "YOUR_AIVEN_PASSWORD" in AIVEN_URL:
+        print("[BRS API] CẢNH BÁO: Chưa cấu hình biến môi trường AIVEN_DATABASE_URL. Vui lòng thêm biến AIVEN_DATABASE_URL trong Deployment configuration!")
+        return
+
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -53,31 +58,17 @@ def init_db():
                     price           NUMERIC(10,2) DEFAULT 0,
                     created_at      TIMESTAMPTZ DEFAULT NOW()
                 );
-
-                CREATE TABLE IF NOT EXISTS book_categories (
-                    book_id     INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
-                    category    TEXT NOT NULL,
-                    PRIMARY KEY (book_id, category)
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_books_rating ON books(rating DESC);
-                CREATE INDEX IF NOT EXISTS idx_books_ratings_count ON books(ratings_count DESC);
-                CREATE INDEX IF NOT EXISTS idx_books_trending ON books(trending_rank ASC NULLS LAST);
-                CREATE INDEX IF NOT EXISTS idx_books_title_trgm ON books USING gin(title gin_trgm_ops);
-                CREATE INDEX IF NOT EXISTS idx_books_author_trgm ON books USING gin(author_name gin_trgm_ops);
             """)
-            # Thử tạo pg_trgm extension (cần cho full-text search)
-            try:
-                cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
-            except Exception:
-                pass
             conn.commit()
-    print("[BRS API] Database schema initialized.")
+    print("[BRS API] Database connection verified.")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        print(f"[BRS API] Khởi động: Tạm thời chưa kết nối được DB ({e}). Hãy đảm bảo bạn đã điền AIVEN_DATABASE_URL trên Aiven App Settings.")
     yield
 
 
@@ -88,10 +79,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — cho phép frontend local
+# CORS — cho phép kết nối từ cả Cloud domain và localhost
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
