@@ -2,6 +2,10 @@ FROM node:20-alpine
 
 WORKDIR /app
 
+ENV VITE_SUPABASE_URL=https://oxftbkdevxewkvzsunuo.supabase.co
+ENV VITE_SUPABASE_ANON_KEY=sb_publishable_TegSFZQvUkzULU8rFda1Kw_tIWMDhKO
+ENV VITE_API_URL=https://01a0c9d9-f877-73c4-a505-60067dcbdc6c-8000.eur-1.aiven.app
+
 COPY package*.json ./
 RUN npm install
 

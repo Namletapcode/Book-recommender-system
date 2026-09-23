@@ -6,23 +6,15 @@ function createSupabaseClient() {
   const envObj = (import.meta as unknown as { env: Record<string, string> }).env;
   const SUPABASE_URL =
     envObj?.['VITE_SUPABASE_URL'] ||
-    (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined);
+    (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined) ||
+    'https://oxftbkdevxewkvzsunuo.supabase.co';
   const SUPABASE_ANON_KEY =
     envObj?.['VITE_SUPABASE_ANON_KEY'] ||
     envObj?.['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
     (typeof process !== 'undefined'
       ? process.env['SUPABASE_ANON_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY']
-      : undefined);
-
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ['VITE_SUPABASE_URL'] : []),
-      ...(!SUPABASE_ANON_KEY ? ['VITE_SUPABASE_ANON_KEY'] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Check your .env.local file.`;
-    console.error(`[Supabase] ${message}`);
-    throw new Error(message);
-  }
+      : undefined) ||
+    'sb_publishable_TegSFZQvUkzULU8rFda1Kw_tIWMDhKO';
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
