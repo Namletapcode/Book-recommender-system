@@ -6,8 +6,21 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-// Base URL của Python API — proxy qua Vite /api → localhost:8000
-const API_BASE = "/api";
+// Base URL của Python API — SSR cần absolute URL, Client dùng proxy /api hoặc trực tiếp
+const BACKEND_URL =
+  (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
+  "https://01a0c9d9-f877-73c4-a505-60067dcbdc6c-8000.eur-1.aiven.app";
+
+function getApiUrl(path: string): string {
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  const fullPath = clean.startsWith("/api") ? clean : `/api${clean}`;
+  if (typeof window === "undefined") {
+    // SSR environment (Node.js) requires an absolute URL
+    return `${BACKEND_URL}${fullPath}`;
+  }
+  // Client environment: can use relative path with Vite proxy or direct backend URL
+  return fullPath;
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,9 +48,15 @@ export type Category = { id: string; name: string; slug: string; icon: string; s
 // ─── Helper gọi Python API ────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`);
-  if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
-  return res.json() as Promise<T>;
+  const url = getApiUrl(path);
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`API error ${res.status}: ${path}`);
+    return (await res.json()) as Promise<T>;
+  } catch (err) {
+    console.error(`[BRS Data] apiFetch error for ${url}:`, err);
+    throw err;
+  }
 }
 
 function normalizeBook(raw: Record<string, unknown>): Book {
@@ -66,8 +85,13 @@ function normalizeBook(raw: Record<string, unknown>): Book {
 export const trendingBooksQuery = queryOptions({
   queryKey: ["books", "trending"],
   queryFn: async (): Promise<Book[]> => {
-    const data = await apiFetch<Record<string, unknown>[]>("/books/trending?limit=10");
-    return data.map(normalizeBook);
+    try {
+      const data = await apiFetch<Record<string, unknown>[]>("/books/trending?limit=10");
+      return data.map(normalizeBook);
+    } catch (err) {
+      console.warn("[trendingBooksQuery] Fallback to empty list:", err);
+      return [];
+    }
   },
   staleTime: 2 * 60 * 1000,
 });
@@ -75,8 +99,13 @@ export const trendingBooksQuery = queryOptions({
 export const topRatedQuery = queryOptions({
   queryKey: ["books", "top-rated"],
   queryFn: async (): Promise<Book[]> => {
-    const data = await apiFetch<Record<string, unknown>[]>("/books/top-rated?limit=20");
-    return data.map(normalizeBook);
+    try {
+      const data = await apiFetch<Record<string, unknown>[]>("/books/top-rated?limit=20");
+      return data.map(normalizeBook);
+    } catch (err) {
+      console.warn("[topRatedQuery] Fallback to empty list:", err);
+      return [];
+    }
   },
   staleTime: 5 * 60 * 1000,
 });
@@ -84,8 +113,13 @@ export const topRatedQuery = queryOptions({
 export const allBooksQuery = queryOptions({
   queryKey: ["books", "all"],
   queryFn: async (): Promise<Book[]> => {
-    const data = await apiFetch<{ data: Record<string, unknown>[] }>("/books?limit=100&sort=rating");
-    return (data.data ?? []).map(normalizeBook);
+    try {
+      const data = await apiFetch<{ data: Record<string, unknown>[] }>("/books?limit=100&sort=rating");
+      return (data.data ?? []).map(normalizeBook);
+    } catch (err) {
+      console.warn("[allBooksQuery] Fallback to empty list:", err);
+      return [];
+    }
   },
   staleTime: 5 * 60 * 1000,
 });
@@ -158,9 +192,17 @@ export function similarBooksQuery(bookId: string) {
 export const categoriesQuery = queryOptions({
   queryKey: ["categories"],
   queryFn: async (): Promise<Category[]> => {
-    const { data, error } = await supabase.from("categories").select("*").order("sort_order");
-    if (error) throw error;
-    return (data ?? []) as Category[];
+    try {
+      const { data, error } = await supabase.from("categories").select("*").order("sort_order");
+      if (error) {
+        console.warn("[categoriesQuery] Supabase error:", error.message);
+        return [];
+      }
+      return (data ?? []) as Category[];
+    } catch (err) {
+      console.warn("[categoriesQuery] Fallback to empty list:", err);
+      return [];
+    }
   },
   staleTime: 10 * 60 * 1000,
 });
