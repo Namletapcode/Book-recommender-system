@@ -120,6 +120,25 @@ class PaginatedBooks(BaseModel):
 
 # === Endpoints ===
 
+@app.get("/")
+def root():
+    return {
+        "status": "online",
+        "service": "Book Recommender System Backend API",
+        "version": "1.0.0",
+        "database": "Aiven Cloud PostgreSQL (2,360,655 books)",
+        "docs_url": "/docs",
+        "endpoints": {
+            "health": "/health",
+            "books": "/api/books?limit=10",
+            "trending": "/api/books/trending?limit=10",
+            "top_rated": "/api/books/top-rated?limit=10",
+            "search": "/api/books/search?q=Harry%20Potter",
+            "categories": "/api/categories"
+        }
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "service": "Book Recommender System API"}
